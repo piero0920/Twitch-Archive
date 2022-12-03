@@ -28,7 +28,7 @@ OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Uploads them to the Cloud
 - Notifies you through Gmail of the progress 
 
-## Explication
+## Explanation
 ### Record live stream:
 Using [Streamlink](https://streamlink.github.io/) downloads the `.ts` file from the live stream since the script starred running, if the script was running since before the beginning of the stream, it will record everything and save it to: `/root_path/streamer_username/video/recorded/LIVE_yyyymmdd_hhmmss.ts`
 
