@@ -9,7 +9,7 @@ Python script to monitor a twitch channel:
 1. Install Python 3
 2. Install Streamlink
 3. If you want to upload to a remote service using rclone, [configure it](https://rclone.org/docs/#configure) (Doesnt need to download, the `rclone.exe` is avalible in [tools/rclone.exe](https://github.com/piero0920/Twitch-Archive/blob/main/tools/rclone.exe)).
-4. `git clone `
+4. `git clone https://github.com/piero0920/Twitch-Archive.git`
 5. `cd Twitch-Archive`
 6. `pip install -r requirements.txt`
 7. Edit the `.env.sample` and rename it to `.env`
