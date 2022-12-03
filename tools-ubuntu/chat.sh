@@ -1,0 +1,2 @@
+./tools-ubuntu/TwitchDownloaderCLI -m ChatDownload --id $1 -o $2 --embed-emotes
+./tools-ubuntu/TwitchDownloaderCLI -m ChatRender -i $2 -o $3 --background-color "#FF111111" -w 500 -h 1080 --outline true -f Arial --font-size 22 --update-rate 1.0 --ffmpeg-path ./tools-ubuntu/ffmpeg --temp-path ./tools-ubuntu/temp
