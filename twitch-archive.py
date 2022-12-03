@@ -202,7 +202,7 @@ class TwitchArchive:
                             if self.downloadMETADATA == 1:
                                 metadata_filename = "metadata_" + created_at + ".json"
                                 with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
-                                    json.dump(vodsinfodic["data"]["0"], f, ensure_ascii=False, indent=4)
+                                    json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
                             try:
                                 os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                                 recorded_filename  = os.path.join(self.recorded_path, live_filename)
