@@ -46,7 +46,7 @@ This option will Download the latest public VOD, if the streamer hasn't publishe
  Then after the `.json` file is downloaded using again [TwitchDownloaderCLI](https://github.com/lay295/TwitchDownloader) renders it to a viewable `.mp4` file and saves it to:
  `/root_path/streamer_username/chat/rendered/CHAT_yyyymmdd_hhmmss.mp4`
  
- If you want to change the rendered settings go to [chat.bat]() file and change the parameters:
+ If you want to change the rendered settings go to [chat.bat](https://github.com/piero0920/Twitch-Archive/blob/main/tools/chat.bat) file and change the parameters:
  `--background-color #FF111111 -w 500 -h 1080 --outline true -f Arial --font-size 22 --update-rate 1.0`
 ### Download metadata
 Using a simple api request downloads the `.json` metadata of the latest VOD and saves it to:
