@@ -1,9 +1,11 @@
 import requests, os, time, json, sys, subprocess, getopt, smtplib
-from colorama import Fore, Style
-from datetime import datetime
+from colorama import Fore, Style 
+from datetime import datetime, timedelta
 from pytz import timezone
+from dateutil import parser
 from dotenv import load_dotenv, find_dotenv
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 load_dotenv(find_dotenv())
 class TwitchArchive:
     def __init__(self):
@@ -47,13 +49,7 @@ class TwitchArchive:
         self.get_channel_id()
         if self.streamlink_debug == 1: self.debug_cmd = "--loglevel trace".split()
         else: self.debug_cmd = "".split()
-        if self.notifications == 1:
-            self.gmail = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-            try:
-                self.gmail.login(os.environ.get('SENDER'), os.environ.get('PWD'))
-            except:
-                print('Your email or password are incorrect, check before running again')
-
+        
         self.recorded_path = os.path.join(self.root_path,self.username,"video", "recorded")
         self.processed_path = os.path.join(self.root_path, self.username, "video", "processed")
         self.chatJSON_path = os.path.join(self.root_path, self.username, "chat", "json")
@@ -157,14 +153,22 @@ class TwitchArchive:
         return date_formated
 
     def sendNotif(self, subject, content):
-        msg = EmailMessage()
-        msg['Subject'] = self.username + " _ " + subject
-        msg['From'] = os.environ.get('SENDER')
-        msg['To'] = os.environ.get('RECEIVER')
-        msg.set_content("Channel: " + self.username + "\n" +"Quality: " + self.quality + "\n" + content)
         if self.notifications == 1:
-            self.gmail.send_message(msg)
-
+            sender = os.environ.get("SENDER")
+            receiver = os.environ.get("RECEIVER")
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = receiver
+            msg['Subject'] = self.username + " _ " + subject
+            body = "Current seccion is for " + self.username + "\n\n" + content
+            msg.attach(MIMEText((body), 'plain'))
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(sender, os.environ.get("PASSWD"))
+            txt = msg.as_string()
+            server.sendmail(sender, receiver, txt)
+            server.quit()
+            
     def loopcheck(self):
         while True:
             status, info = self.check_user()
@@ -178,6 +182,9 @@ class TwitchArchive:
                 print(datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")," ","Error with channel id or oauth token. Try to check internet connection or client-id and client-secret. Will try again in", self.refresh, "seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
+                live_date = datetime.now(timezone('UTC'))
+                live_date_min = live_date - timedelta(minutes=2)
+                live_date_plus = live_date + timedelta(minutes=2)
                 present_datetime = datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")
                 raw_filename = present_datetime + ".ts"
                 live_filename = "LIVE_" + present_datetime + ".ts"
@@ -190,52 +197,52 @@ class TwitchArchive:
                         info = info_tmp
                     try:
                         vodurl      = 'https://api.twitch.tv/helix/videos?user_id=' + str(self.channel_id) + '&type=archive'
-                        vods        = requests.get(vodurl, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 5)
+                        vods        = requests.get(vodurl, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 30)
                         vodsinfodic = json.loads(vods.text)
-                        if vodsinfodic["data"] != []:
-            
-                            vod_id = vodsinfodic["data"][0]["id"]
-                            print(vod_id)
-                            created_at = vodsinfodic["data"][0]["created_at"]
-                            print(created_at)
-                            created_at = self.toTZ(created_at)                            
-                            print(created_at)
-                            raw_filename = created_at + ".ts"
-                            live_filename = "LIVE_" + created_at + ".ts"
-                            raw_vod_filename = "VOD_" + raw_filename
-                            print(raw_filename, live_filename, raw_vod_filename)
-                            if self.downloadMETADATA == 1:
-                                metadata_filename = "metadata_" + created_at + ".json"
-                                with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
-                                    json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
-                            try:
-                                os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
-                                recorded_filename  = os.path.join(self.recorded_path, live_filename)
-                            except Exception as e:
-                                raw_filename = present_datetime + ".ts"
-                                live_filename = "LIVE_" + present_datetime + ".ts"                                
-                                os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
-                                recorded_filename  = os.path.join(self.recorded_path, live_filename)
-                                print(e)
-                                print('first exception as e\nAn error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                                self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                            if self.downloadVOD == 1:
-                                print('Downloading VOD: ' + vodsinfodic["data"][0]["title"])
-                                self.sendNotif('Downloading VOD', vodsinfodic["data"][0]["title"])
-                                subprocess.call(['streamlink', '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segmentsVOD), "twitch.tv/videos/" + vod_id, self.quality] + self.debug_cmd + ["-o", os.path.join(self.recorded_path, raw_vod_filename)])
-                            if self.downloadCHAT == 1:
-                                print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
-                                self.sendNotif('Downloading and rendering CHAT', vodsinfodic["data"][0]["title"])
-                                chat_filename = "CHAT_" + raw_filename[:-2] + "json"
-                                render_filename = "CHAT_" + raw_filename[:-2] + "mp4"
-                                outputJSON = os.path.join(self.chatJSON_path, chat_filename)
-                                outputMP4 = os.path.join(self.chatMP4_path, render_filename)
+                        if vodsinfodic["data"][0] != []:
+                            if live_date_min <= parser.parse(vodsinfodic["data"][0]["created_at"]) <= live_date_plus:
+                                vod_id = vodsinfodic["data"][0]["id"]
+                                created_at = vodsinfodic["data"][0]["created_at"]
+                                created_at = self.toTZ(created_at)
+                                print(created_at + ' date formated')                            
+                                raw_filename = created_at + ".ts"
+                                live_filename = "LIVE_" + created_at + ".ts"
+                                raw_vod_filename = "VOD_" + raw_filename
+                                if self.downloadMETADATA == 1:
+                                    metadata_filename = "metadata_" + created_at + ".json"
+                                    with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
+                                        json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
                                 try:
-                                    subprocess.call(["bash","./tools-ubuntu/chat.sh", vod_id, outputJSON, outputMP4])
+                                    os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
+                                    recorded_filename  = os.path.join(self.recorded_path, live_filename)
                                 except Exception as e:
-                                    self.sendNotif('ERROR', "A ERROR has ocurred and chat will need to be downloaded and rendered manually")
-                                    print("A ERROR has ocurred and chat will need to be downloaded and rendered manually")
-                                    print(e)                            
+                                    raw_filename = present_datetime + ".ts"
+                                    live_filename = "LIVE_" + present_datetime + ".ts"                                
+                                    os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
+                                    recorded_filename  = os.path.join(self.recorded_path, live_filename)
+                                    print(e)
+                                    print('first exception as e\nAn error has occurred. VOD and chat will not be downloaded. Please check them manually.')
+                                    self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n ' + e)
+                                if self.downloadVOD == 1:
+                                    print('Downloading VOD: ' + vodsinfodic["data"][0]["title"])
+                                    self.sendNotif('Downloading VOD', vodsinfodic["data"][0]["title"])
+                                    subprocess.call(['streamlink', '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segmentsVOD), "twitch.tv/videos/" + vod_id, self.quality] + self.debug_cmd + ["-o", os.path.join(self.recorded_path, raw_vod_filename)])
+                                if self.downloadCHAT == 1:
+                                    print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
+                                    self.sendNotif('Downloading and rendering CHAT', vodsinfodic["data"][0]["title"])
+                                    chat_filename = "CHAT_" + raw_filename[:-2] + "json"
+                                    render_filename = "CHAT_" + raw_filename[:-2] + "mp4"
+                                    outputJSON = os.path.join(self.chatJSON_path, chat_filename)
+                                    outputMP4 = os.path.join(self.chatMP4_path, render_filename)
+                                    try:
+                                        subprocess.call(["bash","./tools-ubuntu/chat.sh", vod_id, outputJSON, outputMP4])
+                                    except Exception as e:
+                                        self.sendNotif('ERROR', "A ERROR has ocurred and chat will need to be downloaded and rendered manually.\n " + e)
+                                        print("A ERROR has ocurred and chat will need to be downloaded and rendered manually")
+                                        print(e)  
+                            else: 
+                                print('A ERROR has ocurred, the latest VOD doesnt match with the livestream')
+                                self.sendNotif('ERROR', 'A ERROR has ocurred, the latest VOD doesnt match with the livestream')                          
                         else:
                             raw_filename = present_datetime + ".ts"
                             live_filename = "LIVE_" + present_datetime + ".ts"                            
@@ -248,7 +255,7 @@ class TwitchArchive:
                         recorded_filename  = os.path.join(self.recorded_path, live_filename)
                         print(e)
                         print('An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                        self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
+                        self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
                 print("Recording stream is done. Fixing video file.")
                 self.sendNotif("STREAM DONE", "Recording stream is done. Fixing video file.")
                 if(os.path.exists(recorded_filename) is True):
