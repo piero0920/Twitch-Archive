@@ -190,6 +190,9 @@ class TwitchArchive:
                 raw_filename = present_datetime + ".ts"
                 live_filename = "LIVE_" + raw_filename
                 raw_vod_filename = "VOD_" + raw_filename
+                chat_json_filename = "CHAT_" + present_datetime + ".json"
+                chat_mp4_filename = "CHAT_" + present_datetime + ".mp4"
+                metadata_filename = "metadata_" + present_datetime + ".json" 
                 recorded_filename = os.path.join(self.recorded_path, live_filename)
                 # start streamlink process
                 subprocess.call(["streamlink", '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segments), "--hls-live-restart", "--twitch-disable-hosting", "twitch.tv/" + self.username, self.quality, "--retry-streams", str(self.refresh)] + self.debug_cmd + ["-o", recorded_filename])
@@ -209,19 +212,24 @@ class TwitchArchive:
                                 raw_filename = created_at + ".ts"
                                 live_filename = "LIVE_" + raw_filename
                                 raw_vod_filename = "VOD_" + raw_filename
+                                chat_json_filename = "CHAT_" + created_at + ".json"
+                                chat_mp4_filename = "CHAT_" + created_at + ".mp4"
+                                metadata_filename = "metadata_" + created_at + ".json"  
                                 try:
                                     os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                                     recorded_filename  = os.path.join(self.recorded_path, live_filename)
                                 except Exception as e:
                                     raw_filename = present_datetime + ".ts"
                                     live_filename = "LIVE_" + raw_filename 
-                                    raw_vod_filename = "VOD_" + raw_filename                                
+                                    raw_vod_filename = "VOD_" + raw_filename
+                                    chat_json_filename = "CHAT_" + present_datetime + ".json"
+                                    chat_mp4_filename = "CHAT_" + present_datetime + ".mp4"
+                                    metadata_filename = "metadata_" + present_datetime + ".json"                                  
                                     os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                                     recorded_filename  = os.path.join(self.recorded_path, live_filename)
                                     print('first exception as e\nAn error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
                                     self.sendNotif('ERROR - '+ present_datetime, 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n ' + e)
                                 if self.downloadMETADATA == 1:
-                                    metadata_filename = "metadata_" + created_at + ".json"
                                     self.sendNotif('Metadata - ' + created_at,'Downloading and saving metadata:\n' + json.dumps(vodsinfodic["data"][0], indent=4))
                                     with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
                                         json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
@@ -236,28 +244,30 @@ class TwitchArchive:
                                 if self.downloadCHAT == 1:
                                     print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
                                     self.sendNotif('CHAT - ' + created_at,'Downloading JSON and rendering chat logs from VOD:\n' + vodsinfodic["data"][0]["title"])
-                                    chat_filename = "CHAT_" + raw_filename[:-2] + "json"
-                                    render_filename = "CHAT_" + raw_filename[:-2] + "mp4"
-                                    outputJSON = os.path.join(self.chatJSON_path, chat_filename)
-                                    outputMP4 = os.path.join(self.chatMP4_path, render_filename)
                                     try:
-                                        subprocess.call(["bash","./bin/chat.sh", vod_id, outputJSON, outputMP4])
+                                        subprocess.call(["bash","./bin/chat.sh", vod_id, os.path.join(self.chatJSON_path, chat_json_filename), os.path.join(self.chatMP4_path, chat_mp4_filename)])
                                     except Exception as e:
                                         self.sendNotif('ERROR - ' + created_at, "A ERROR has ocurred and chat will need to be downloaded and rendered manually.\n" + e)
                                         print("A ERROR has ocurred and chat will need to be downloaded and rendered manually\n" + e)
                             else: 
-                                print('A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published')
-                                self.sendNotif('ERROR - ' + present_datetime, 'A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published')                          
+                                print('A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published\nThe VOD and chat will not be downloaded and rendered.')
+                                self.sendNotif('ERROR - ' + present_datetime, 'A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published\nThe VOD and chat will not be downloaded and rendered.')                          
                         else:
                             raw_filename = present_datetime + ".ts"
                             live_filename = "LIVE_" + raw_filename 
-                            raw_vod_filename = "VOD_" + raw_filename                        
+                            raw_vod_filename = "VOD_" + raw_filename
+                            chat_json_filename = "CHAT_" + present_datetime + ".json"
+                            chat_mp4_filename = "CHAT_" + present_datetime + ".mp4"
+                            metadata_filename = "metadata_" + present_datetime + ".json"                          
                             os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                             recorded_filename  = os.path.join(self.recorded_path, live_filename)
                     except Exception as e:
                         raw_filename = present_datetime + ".ts"
                         live_filename = "LIVE_" + raw_filename 
-                        raw_vod_filename = "VOD_" + raw_filename                      
+                        raw_vod_filename = "VOD_" + raw_filename
+                        chat_json_filename = "CHAT_" + present_datetime + ".json"
+                        chat_mp4_filename = "CHAT_" + present_datetime + ".mp4"
+                        metadata_filename = "metadata_" + present_datetime + ".json"                        
                         os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                         recorded_filename  = os.path.join(self.recorded_path, live_filename)
                         print('An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
@@ -294,12 +304,12 @@ class TwitchArchive:
                             print(f'{Fore.RED}Deleting ' + os.path.join(self.processed_path, vod_filename) + f'{Style.RESET_ALL}')
                             os.remove(os.path.join(self.processed_path, vod_filename))
                     if self.downloadCHAT == 1: 
-                        if(os.path.exists(os.path.join(self.chatJSON_path, chat_filename)) is True):
-                            print(f'{Fore.RED}Deleting ' + os.path.join(self.chatJSON_path, chat_filename) + f'{Style.RESET_ALL}')
-                            os.remove(os.path.join(self.chatJSON_path, chat_filename))
-                        if(os.path.exists(os.path.join(self.chatMP4_path, render_filename)) is True):
-                            print(f'{Fore.RED}Deleting ' + os.path.join(self.chatMP4_path, render_filename) + f'{Style.RESET_ALL}')
-                            os.remove(os.path.join(self.chatMP4_path, render_filename))
+                        if(os.path.exists(os.path.join(self.chatJSON_path, chat_json_filename)) is True):
+                            print(f'{Fore.RED}Deleting ' + os.path.join(self.chatJSON_path, chat_json_filename) + f'{Style.RESET_ALL}')
+                            os.remove(os.path.join(self.chatJSON_path, chat_json_filename))
+                        if(os.path.exists(os.path.join(self.chatMP4_path, chat_mp4_filename)) is True):
+                            print(f'{Fore.RED}Deleting ' + os.path.join(self.chatMP4_path, chat_mp4_filename) + f'{Style.RESET_ALL}')
+                            os.remove(os.path.join(self.chatMP4_path, chat_mp4_filename))
                     if self.downloadMETADATA == 1:
                         if(os.path.exists(os.path.join(self.metadata_path, metadata_filename)) is True):
                             print(f'{Fore.RED}Deleting ' + os.path.join(self.metadata_path, metadata_filename) + f'{Style.RESET_ALL}')
