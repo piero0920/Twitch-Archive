@@ -1,9 +1,11 @@
-import requests, os, time, json, sys, subprocess, getopt, smtplib
-from colorama import Fore, Style
-from datetime import datetime
+import requests, os, time, json, sys, subprocess, getopt, smtplib, pathlib
+from colorama import Fore, Style 
+from datetime import datetime, timedelta
 from pytz import timezone
+from dateutil import parser
 from dotenv import load_dotenv, find_dotenv
-from email.message import EmailMessage
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 load_dotenv(find_dotenv())
 class TwitchArchive:
     def __init__(self):
@@ -14,11 +16,11 @@ class TwitchArchive:
         self.root_path          = r"archive"                       # Path where this script saves everything (livestream,VODs,chat,metadata)
         self.timezone           = "US/Eastern"                     # Timezones, you can see a list of the format timezone here: https://gist.github.com/heyalexej/8bf688fd67d7199be4a1682b3eec7568
         self.refresh            = 5.0                              # Time between checking (5.0 is recommended)
-        self.notifications      = 0                                # 0 - disable email notification of current seccion, 1 - enable email notification of current seccion
+        self.notifications      = 1                                # 0 - disable email notification of current seccion, 1 - enable email notification of current seccion
         self.downloadMETADATA   = 1                                # 0 - disable metadata downloading, 1 - enable metadata downloading
         self.downloadVOD        = 1                                # 0 - disable VOD downloading after stream finished, 1 - enable VOD downloading after stream finished (this option downloads the latest public vod)
         self.downloadCHAT       = 1                                # 0 - disable chat downloading and rendering, 1 - enable chat downloading and rendering
-        self.uploadCloud        = 0                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
+        self.uploadCloud        = 1                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
         self.deleteFiles        = 1                                # 0 - disable the deleting of files from current seccion after being uploaded to the cloud, 1 - enable the deleting files of files from current seccion after being uploaded to the cloud (BE CAREFUL WITH THIS OPTION)
         self.streamlink_debug   = 0                                # 0 - disable streamlink debug display, 1 - enable streamlink debug display
         self.hls_segments       = 3                                # 1-10 for live stream, it's possible to use multiple threads to potentially increase the throughput. 2-3 is enough
@@ -27,7 +29,7 @@ class TwitchArchive:
     def run(self):
         print('Twitch-Archive')
         print('Configuration:')
-        print(f'Root path: {Fore.GREEN}{self.root_path}{Style.RESET_ALL}')
+        print(f'Root path: {Fore.GREEN}' + str(pathlib.Path(self.root_path).resolve()) + f'{Style.RESET_ALL}')
         print(f'Timezone: {Fore.GREEN}{self.timezone}{Style.RESET_ALL}')
         print(f'Refresh rate: {Fore.GREEN} {str(self.refresh)}{Style.RESET_ALL}')
         if self.notifications == 1: print(f'Email notifications: {Fore.GREEN}Enabled{Style.RESET_ALL}')
@@ -39,21 +41,16 @@ class TwitchArchive:
         if self.downloadCHAT == 1: print(f'Chat downloading {Fore.GREEN}Enabled{Style.RESET_ALL}')
         else: print(f'Chat downloading: {Fore.RED}Disabled{Style.RESET_ALL}')
         if self.uploadCloud == 1: print(f'Upload to Google Drive: {Fore.GREEN}Enabled{Style.RESET_ALL}')
-        else: print(f'Upload to Google Drive: {Fore.RED}Disabled{Style.RESET_ALL}')
+        else: print(f'Upload to cloud service: {Fore.RED}Disabled{Style.RESET_ALL}')
         if self.deleteFiles == 1: print(f'{Fore.RED}'+'\033[1m'+f'CAREFUL FILES ARE CONFIGURATED TO BE DELETED{Style.RESET_ALL}')
+        else: print(f'{Fore.GREEN}'+'\033[1m'+f'Files will NOT be deleted{Style.RESET_ALL}')
         if self.uploadCloud == 0 and self.deleteFiles == 1: print(f'{Fore.RED}'+'\033[1m'+f'FILES WILL BE DELETED AND NO UPLOADED {Style.RESET_ALL}{Fore.GREEN}\n"CTRL + C"{Style.RESET_ALL}{Fore.RED}'+'\033[1m'+f' TO STOP AND CHANGED CONFIGURATION{Style.RESET_ALL}')
         
         self.oauth_token = self.get_oauth_token()
         self.get_channel_id()
         if self.streamlink_debug == 1: self.debug_cmd = "--loglevel trace".split()
         else: self.debug_cmd = "".split()
-        if self.notifications == 1:
-            self.gmail = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-            try:
-                self.gmail.login(os.environ.get('SENDER'), os.environ.get('PWD'))
-            except:
-                print('Your email or password are incorrect, check before running again')
-
+        
         self.recorded_path = os.path.join(self.root_path,self.username,"video", "recorded")
         self.processed_path = os.path.join(self.root_path, self.username, "video", "processed")
         self.chatJSON_path = os.path.join(self.root_path, self.username, "chat", "json")
@@ -77,13 +74,13 @@ class TwitchArchive:
                     os.makedirs(stream_dir_path)
                     print('Fixing ' + recorded_filename + '.')
                     try:
-                        subprocess.call(['./tools/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(stream_dir_path, f[:-2]+"mp4")], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+                        subprocess.call(["powershell.exe",'./bin/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(stream_dir_path, f[:-2]+"mp4")], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
                     except Exception as e:
                         print(e)
                 elif(os.path.exists(os.path.join(stream_dir_path, f)) is False):
                     print('Fixing ' + recorded_filename + '.')
                     try:                     
-                        subprocess.call(['./tools/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(stream_dir_path, f[:-2]+"mp4")], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+                        subprocess.call(["powershell.exe",'./bin/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(stream_dir_path, f[:-2]+"mp4")], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
                     except Exception as e:
                         print(e)
         except Exception as e:
@@ -157,14 +154,22 @@ class TwitchArchive:
         return date_formated
 
     def sendNotif(self, subject, content):
-        msg = EmailMessage()
-        msg['Subject'] = self.username + " _ " + subject
-        msg['From'] = os.environ.get('SENDER')
-        msg['To'] = os.environ.get('RECEIVER')
-        msg.set_content("Channel: " + self.username + "\n" +"Quality: " + self.quality + "\n" + content)
         if self.notifications == 1:
-            self.gmail.send_message(msg)
-
+            sender = os.environ.get("SENDER")
+            receiver = os.environ.get("RECEIVER")
+            msg = MIMEMultipart()
+            msg['From'] = sender
+            msg['To'] = receiver
+            msg['Subject'] = self.username + " _ " + subject
+            body = "Current seccion is for " + self.username + "\n\n\n\n" + content
+            msg.attach(MIMEText((body), 'plain'))
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(sender, os.environ.get("PASSWD"))
+            txt = msg.as_string()
+            server.sendmail(sender, receiver, txt)
+            server.quit()
+            
     def loopcheck(self):
         while True:
             status, info = self.check_user()
@@ -178,9 +183,13 @@ class TwitchArchive:
                 print(datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")," ","Error with channel id or oauth token. Try to check internet connection or client-id and client-secret. Will try again in", self.refresh, "seconds.")
                 time.sleep(self.refresh)
             elif status == 0:
+                live_date = datetime.now(timezone('UTC'))
+                live_date_min = live_date - timedelta(minutes=2)
+                live_date_plus = live_date + timedelta(minutes=2)
                 present_datetime = datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")
                 raw_filename = present_datetime + ".ts"
-                live_filename = "LIVE_" + present_datetime + ".ts"
+                live_filename = "LIVE_" + raw_filename
+                raw_vod_filename = "VOD_" + raw_filename
                 recorded_filename = os.path.join(self.recorded_path, live_filename)
                 # start streamlink process
                 subprocess.call(["streamlink", '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segments), "--hls-live-restart", "--twitch-disable-hosting", "twitch.tv/" + self.username, self.quality, "--retry-streams", str(self.refresh)] + self.debug_cmd + ["-o", recorded_filename])
@@ -190,87 +199,88 @@ class TwitchArchive:
                         info = info_tmp
                     try:
                         vodurl      = 'https://api.twitch.tv/helix/videos?user_id=' + str(self.channel_id) + '&type=archive'
-                        vods        = requests.get(vodurl, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 5)
+                        vods        = requests.get(vodurl, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 30)
                         vodsinfodic = json.loads(vods.text)
-                        if vodsinfodic["data"] != []:
-                            vod_id = vodsinfodic["data"][0]["id"]
-                            created_at = vodsinfodic["data"][0]["created_at"]
-                            created_at = self.toTZ(created_at)                            
-                            raw_filename = created_at + ".ts"
-                            live_filename = "LIVE_" + created_at + ".ts"
-                            raw_vod_filename = "VOD_" + raw_filename
-                            if self.downloadMETADATA == 1:
-                                metadata_filename = "metadata_" + created_at + ".json"
-                                with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
-                                    json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
-                            try:
-                                os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
-                                recorded_filename  = os.path.join(self.recorded_path, live_filename)
-                            except Exception as e:
-                                raw_filename = present_datetime + ".ts"
-                                live_filename = "LIVE_" + present_datetime + ".ts"                                
-                                os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
-                                recorded_filename  = os.path.join(self.recorded_path, live_filename)
-                                print(e)
-                                print('first exception as e\nAn error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                                self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                            if self.downloadVOD == 1:
-                                print('Downloading VOD: ' + vodsinfodic["data"][0]["title"])
-                                self.sendNotif('Downloading VOD', vodsinfodic["data"][0]["title"])
-                                subprocess.call(['streamlink', '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segmentsVOD), "twitch.tv/videos/" + vod_id, self.quality] + self.debug_cmd + ["-o", os.path.join(self.recorded_path, raw_vod_filename)])
-                            if self.downloadCHAT == 1:
-                                print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
-                                self.sendNotif('Downloading and rendering CHAT', vodsinfodic["data"][0]["title"])
-                                chat_filename = "CHAT_" + raw_filename[:-2] + "json"
-                                render_filename = "CHAT_" + raw_filename[:-2] + "mp4"
-                                outputJSON = os.path.join(self.chatJSON_path, chat_filename)
-                                outputMP4 = os.path.join(self.chatMP4_path, render_filename)
+                        if vodsinfodic["data"][0] != []:
+                            if live_date_min <= parser.parse(vodsinfodic["data"][0]["created_at"]) <= live_date_plus:
+                                vod_id = vodsinfodic["data"][0]["id"]
+                                created_at = vodsinfodic["data"][0]["created_at"]
+                                created_at = self.toTZ(created_at)
+                                raw_filename = created_at + ".ts"
+                                live_filename = "LIVE_" + raw_filename
+                                raw_vod_filename = "VOD_" + raw_filename
                                 try:
-                                    subprocess.call(["powershell.exe",f'./tools/chat.bat {vod_id} ../{outputJSON} ../{outputMP4}'])
+                                    os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
+                                    recorded_filename  = os.path.join(self.recorded_path, live_filename)
                                 except Exception as e:
-                                    self.sendNotif('ERROR', "A ERROR has ocurred and chat will need to be downloaded and rendered manually")
-                                    print("A ERROR has ocurred and chat will need to be downloaded and rendered manually")
-                                    print(e)                            
+                                    raw_filename = present_datetime + ".ts"
+                                    live_filename = "LIVE_" + raw_filename
+                                    raw_vod_filename = "VOD_" + raw_filename                              
+                                    os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
+                                    recorded_filename  = os.path.join(self.recorded_path, live_filename)
+                                    print('first exception as e\nAn error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
+                                    self.sendNotif('ERROR - '+ present_datetime, 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n ' + e)
+                                if self.downloadMETADATA == 1:
+                                    metadata_filename = "metadata_" + created_at + ".json"
+                                    self.sendNotif('Metadata - ' + created_at,'Downloading and saving metadata:\n' + json.dumps(vodsinfodic["data"][0], indent=4))
+                                    with open(os.path.join(self.metadata_path, metadata_filename), 'w', encoding='utf-8') as f:
+                                        json.dump(vodsinfodic["data"][0], f, ensure_ascii=False, indent=4)
+                                if self.downloadVOD == 1:
+                                    print('Downloading VOD: ' + vodsinfodic["data"][0]["title"])
+                                    self.sendNotif('VOD - ' + created_at,'Downloading VOD: ' + vodsinfodic["data"][0]["title"])
+                                    try:
+                                        subprocess.call(['streamlink', '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segmentsVOD), "twitch.tv/videos/" + vod_id, self.quality] + self.debug_cmd + ["-o", os.path.join(self.recorded_path, raw_vod_filename)])
+                                    except Exception as e:
+                                        print('Error', 'A ERROR has ocurred and the VOD will not be downloaded.\n' + e)
+                                        self.sendNotif('ERROR - ' + created_at, 'A ERROR has ocurred and the VOD will not be downloaded. \nerror:\n' + e)
+                                if self.downloadCHAT == 1:
+                                    print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
+                                    self.sendNotif('CHAT - ' + created_at,'Downloading JSON and rendering chat logs from VOD:\n' + vodsinfodic["data"][0]["title"])
+                                    chat_filename = "CHAT_" + raw_filename[:-2] + "json"
+                                    render_filename = "CHAT_" + raw_filename[:-2] + "mp4"
+                                    outputJSON = os.path.join(self.chatJSON_path, chat_filename)
+                                    outputMP4 = os.path.join(self.chatMP4_path, render_filename)
+                                    try:
+                                        subprocess.call(["powershell.exe","./bin/chat.bat", vod_id, '../'+outputJSON, '../'+outputMP4])
+                                    except Exception as e:
+                                        self.sendNotif('ERROR - ' + created_at, "A ERROR has ocurred and chat will need to be downloaded and rendered manually.\n" + e)
+                                        print("A ERROR has ocurred and chat will need to be downloaded and rendered manually\n" + e)
+                            else: 
+                                print('A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published\nThe VOD and chat will not be downloaded and rendered.')
+                                self.sendNotif('ERROR - ' + present_datetime, 'A ERROR has ocurred, the latest VOD doesnt match with the livestream, the VOD is not published\nThe VOD and chat will not be downloaded and rendered.')                          
                         else:
                             raw_filename = present_datetime + ".ts"
-                            live_filename = "LIVE_" + present_datetime + ".ts"                            
+                            live_filename = "LIVE_" + raw_filename  
+                            raw_vod_filename = "VOD_" + raw_filename                        
                             os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                             recorded_filename  = os.path.join(self.recorded_path, live_filename)
                     except Exception as e:
                         raw_filename = present_datetime + ".ts"
-                        live_filename = "LIVE_" + present_datetime + ".ts"                        
+                        live_filename = "LIVE_" + raw_filename
+                        raw_vod_filename = "VOD_" + raw_filename                       
                         os.rename(recorded_filename,os.path.join(self.recorded_path, live_filename))
                         recorded_filename  = os.path.join(self.recorded_path, live_filename)
-                        print(e)
-                        print('An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
-                        self.sendNotif('ERROR', 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.')
+                        print('An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
+                        self.sendNotif('ERROR - ' + present_datetime, 'An error has occurred. VOD and chat will not be downloaded. Please check them manually.\n' + e)
                 print("Recording stream is done. Fixing video file.")
-                self.sendNotif("STREAM DONE", "Recording stream is done. Fixing video file.")
+                self.sendNotif("STREAM DONE - " + present_datetime, "Recording stream is done. Fixing video file.")
                 if(os.path.exists(recorded_filename) is True):
                     file_mp4 = live_filename[:-2] + "mp4"
+                    vod_filename = raw_vod_filename[:-2] + "mp4"
                     processed_filename = os.path.join(self.processed_path, file_mp4) 
-                    try:                    
-                        subprocess.call(['./tools/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', processed_filename], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-                    except Exception as e:
-                        print(e)
+                    subprocess.call(['./bin/ffmpeg.exe', '-y', '-i', recorded_filename, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', processed_filename], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
                     if(os.path.exists(os.path.join(self.recorded_path, raw_vod_filename)) is True):
-                        vod_filename = raw_vod_filename[:-2] + "mp4"
-                        try:
-                            subprocess.call(['./tools/ffmpeg.exe', '-y', '-i', os.path.join(self.recorded_path, raw_vod_filename), '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(self.processed_path, vod_filename)], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-                        except Exception as e:
-                            print(e)
+                        subprocess.call(['./bin/ffmpeg.exe', '-y', '-i', os.path.join(self.recorded_path, raw_vod_filename), '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', os.path.join(self.processed_path, vod_filename)], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
                 else:
                     print("Skip fixing. File not found.")
-                    self.sendNotif("ERROR", "Skip fixing. File not found.")
                 print("Fixing is done.")
                 if self.uploadCloud == 1: 
-                    tree = subprocess.run(["powershell.exe", f"tree {self.root_path}/{self.username} /f"],text=True,capture_output=True).stdout.strip()[106:]
-                    print('Uploading to cloud the Following files')
-                    print(tree)
-                    self.sendNotif("UPLOADING TO CLOUD", 'the following files: \n' + tree)
-                    subprocess.call(["powershell.exe", f"./tools/upload.bat {self.root_path} {self.username}"])
+                    tree = subprocess.run(["powershell.exe","tree", f"'{self.root_path}/{self.username}'", "/f"], capture_output=True, text=True).stdout.split("\n",2)[2]
+                    print('Uploading the following files:\n' + tree)
+                    self.sendNotif("UPLOADING - " + present_datetime, 'Uploading the following files: \n' + tree)
+                    subprocess.call(["powershell.exe","./bin/upload.bat", self.root_path,self.username])
                 if self.deleteFiles == 1:
-                    self.sendNotif("DELETING", "the files were deleted")
+                    self.sendNotif("DELETING - " + present_datetime, "Deleting the files from current seccion.")
                     print(f'{Fore.RED}DELETING FILES{Style.RESET_ALL}')
                     print(f'{Fore.RED}Deleting ' + recorded_filename + f'{Style.RESET_ALL}')
                     os.remove(recorded_filename)
@@ -295,7 +305,7 @@ class TwitchArchive:
                             print(f'{Fore.RED}Deleting ' + os.path.join(self.metadata_path, metadata_filename) + f'{Style.RESET_ALL}')
                             os.remove(os.path.join(self.metadata_path, metadata_filename))
                 print('CURRENT SECCION HAVE FINISHED GOING BACK TO CHECKING')
-                self.sendNotif("SECCION DONE", 'CURRENT SECCION HAVE FINISHED GOING BACK TO CHECKING')
+                self.sendNotif("SECCION DONE - " + present_datetime, 'CURRENT SECCION HAVE FINISHED GOING BACK TO CHECKING')
                 time.sleep(self.refresh)
 def main(argv):
     twitch_recorder = TwitchArchive()
