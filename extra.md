@@ -1,9 +1,11 @@
+## Linux
+- use [twitch-archive](https://github.com/piero0920/Twitch-Archive/blob/main/twitch-archive)
 - install and configure rclone 
 ```
 cd bin
 sudo chmod +x chat.sh upload.sh TwitchDownloaderCLI ffmpeg
-
 ```
+- edit [bin/upload.sh](https://github.com/piero0920/Twitch-Archive/blob/main/bin/upload.sh): `gd:VODS` to `remote:dest` (your remote name and folder of rclone)
 ## Explanation
 ### Record live stream:
 Using [Streamlink](https://streamlink.github.io/) downloads the `.ts` file from the live stream since the script starred running, if the script was running since before the beginning of the stream, it will record everything and save it to: `/root_path/streamer_username/video/recorded/LIVE_yyyymmdd_hhmmss.ts`
