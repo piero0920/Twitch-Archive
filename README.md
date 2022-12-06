@@ -21,9 +21,9 @@ OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 8. if you want to enable/disable more available options, edit `twitch-archive.py`
 9. run `Python twitch-archive.py` or for multiple streamers `Python twitch-archive.py -u streamer` 
 ## Features 
-- Auto records the live stream
-- Downloads the VOD after stream ended
-- Downloads the chat logs of the VOD and renders it 
-- Downloads the metadata of the VOD
-- Uploads them to the Cloud
-- Notifies you through Gmail of the progress 
+- Auto records the live stream                         | [Streamlink](https://streamlink.github.io/)
+- Downloads the VOD after stream ended                 | [Streamlink](https://streamlink.github.io/)
+- Downloads the chat logs of the VOD and renders it    | [TwitchDownloaderCLI](https://github.com/lay295/TwitchDownloader)
+- Downloads the metadata of the VOD                    | [Twitch api](https://dev.twitch.tv/docs/api/reference#get-videos)
+- Uploads them to the Cloud                            | [rclone](https://rclone.org/)
+- Notifies you through Gmail of the progress           | [smtplib](https://docs.python.org/3/library/smtplib.html)
