@@ -114,33 +114,17 @@ class TwitchArchive:
             print(f'\n{e}\n')
 
     def check_user(self):
-        # 0: online, 1: not found, 2: error, 3: channel id error
-        info = None
-        if self.user_not_found != 1 and self.getting_channel_id_error != 1:
-            url    = 'https://api.twitch.tv/helix/channels?broadcaster_id=' + str(self.channel_id)
-            status = 2
             try:
-                r = requests.get(url, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 15)
-                r.raise_for_status()
-                info   = r.json()
-                status = 0
-            except requests.exceptions.RequestException as e:
-                if e.response != None:
-                    if e.response.status_code == 401:
-                        print('\nRequest to Twitch returned an error %s, trying to get new oauth_token...'% (e.response.status_code))
-                        self.getting_channel_id_error = 1
-                    else:
-                        print('\nRequest to Twitch returned an error %s, the response is:\n%s\n'% (e.response.status_code, e.response))
+                url = 'https://api.twitch.tv/helix/streams?user_id=' + self.channel_id
+                req = requests.get(url, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 30)
+                stream_data = req.json()
+                if len(stream_data['data']) == 1:
+                    return True
                 else:
-                    print(f'\n{e}\n')
-        elif self.user_not_found == 1:
-            status = 1
-        else:
-            self.oauth_token = self.get_oauth_token()
-            self.get_channel_id()
-            status = 3
-
-        return status, info
+                    return False
+            except Exception as e:
+                print("ERROR checking user: ", e)
+                return False
 
     def toTZ(self, utc_str):
         new_date = str(datetime.fromisoformat(utc_str.replace('Z', '+00:00')).astimezone(timezone(self.timezone)))
@@ -172,20 +156,10 @@ class TwitchArchive:
 
     def loopcheck(self):
         while True:
-            status, info = self.check_user()
-            if status == 1:
-                print("Username not found. Invalid username or typo.")
-                time.sleep(self.refresh)
-            elif status == 2:
-                print(datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")," ","Unexpected error. Try to check internet connection or client-id. Will try again in", self.refresh, "seconds.")
-                time.sleep(self.refresh)
-            elif status == 3:
-                print(datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")," ","Error with channel id or oauth token. Try to check internet connection or client-id and client-secret. Will try again in", self.refresh, "seconds.")
-                time.sleep(self.refresh)
-            elif status == 0:
+            if self.check_user() is True:
                 live_date = datetime.now(timezone('UTC'))
-                live_date_min = live_date - timedelta(minutes=5)
-                live_date_plus = live_date + timedelta(minutes=5)
+                live_date_min = live_date - timedelta(minutes=10)
+                live_date_plus = live_date + timedelta(minutes=10)
                 present_datetime = datetime.now(timezone(self.timezone)).strftime("%Y%m%d_%Hh%Mm%Ss")
                 raw_filename = present_datetime + ".ts"
                 live_filename = "LIVE_" + raw_filename
@@ -197,9 +171,6 @@ class TwitchArchive:
                 # start streamlink process
                 subprocess.call(["streamlink", '--http-header', 'Authorization=OAuth ' + os.environ.get('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segments), "--hls-live-restart", "--twitch-disable-hosting", "twitch.tv/" + self.username, self.quality, "--retry-streams", str(self.refresh)] + self.debug_cmd + ["-o", recorded_filename])
                 if(os.path.exists(recorded_filename) is True):
-                    status, info_tmp = self.check_user()
-                    if info_tmp != None:
-                        info = info_tmp
                     try:
                         vodurl      = 'https://api.twitch.tv/helix/videos?user_id=' + str(self.channel_id) + '&type=archive'
                         vods        = requests.get(vodurl, headers = {"Authorization" : "Bearer " + self.oauth_token, "Client-ID": os.environ.get('CLIENT-ID')}, timeout = 30)
@@ -245,7 +216,7 @@ class TwitchArchive:
                                     print('Downloading and rendering CHAT: ' + vodsinfodic["data"][0]["title"])
                                     self.sendNotif('CHAT - ' + created_at,'Downloading JSON and rendering chat logs from VOD:\n' + vodsinfodic["data"][0]["title"])
                                     try:
-                                        subprocess.call([str(pathlib.Path(__file__).parent.resolve())+"/bin/chat.sh", vod_id, os.path.join(self.chatJSON_path, chat_json_filename), os.path.join(self.chatMP4_path, chat_mp4_filename)])
+                                        subprocess.call(["bash",str(pathlib.Path(__file__).parent.resolve())+"/bin/chat.sh", vod_id, os.path.join(self.chatJSON_path, chat_json_filename), os.path.join(self.chatMP4_path, chat_mp4_filename)])
                                     except Exception as e:
                                         self.sendNotif('ERROR - ' + created_at, "A ERROR has ocurred and chat will need to be downloaded and rendered manually.\n" + e)
                                         print("A ERROR has ocurred and chat will need to be downloaded and rendered manually\n" + e)
@@ -285,7 +256,7 @@ class TwitchArchive:
                     print("Skip fixing. File not found.")
                 print("Fixing is done.")
                 if self.uploadCloud == 1:
-                    tree = subprocess.check_output(["tree", str(pathlib.Path(self.root_path).resolve())+"/"+self.username]).decode(sys.stdout.encoding)
+                    tree = subprocess.check_output(["tree", str(pathlib.Path(self.root_path).resolve())+"/"+self.username]).decode(sys.stdout.encoding).split("\n",1)[1]
                     print('Uploading the following files:\n' + tree)
                     self.sendNotif("UPLOADING - " + present_datetime, 'Uploading the following files: \n' + tree)
                     subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/upload.sh', str(pathlib.Path(self.root_path).resolve()),self.username])
