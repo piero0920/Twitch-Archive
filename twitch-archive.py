@@ -14,11 +14,11 @@ class TwitchArchive:
         # global configuration
         self.root_path          = r"archive"                       # Path where this script saves everything (livestream,VODs,chat,metadata)
         self.refresh            = 5.0                              # Time between checking (5.0 is recommended), avoid less than 1.0
-        self.notifications      = 1                                # 0 - disable email notification of current seccion, 1 - enable email notification of current seccion
+        self.notifications      = 0                                # 0 - disable email notification of current seccion, 1 - enable email notification of current seccion
         self.downloadMETADATA   = 1                                # 0 - disable metadata downloading, 1 - enable metadata downloading
         self.downloadVOD        = 1                                # 0 - disable VOD downloading after stream finished, 1 - enable VOD downloading after stream finished (this option downloads the latest public vod)
         self.downloadCHAT       = 1                                # 0 - disable chat downloading and rendering, 1 - enable chat downloading and rendering
-        self.uploadCloud        = 1                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
+        self.uploadCloud        = 0                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
         self.deleteFiles        = 0                                # 0 - disable the deleting of files from current seccion after being uploaded to the cloud, 1 - enable the deleting files of files from current seccion after being uploaded to the cloud (BE CAREFUL WITH THIS OPTION)
         self.cleanRaw           = 1                                # 0 - disable the deleting of raw (.ts) files, 1 - enable the deleteing of raw (.ts) files (if upload enable they will be deleted before) 
         self.hls_segments       = 3                                # 1-10 for live stream, it's possible to use multiple threads to potentially increase the throughput. 2-3 is enough
@@ -147,7 +147,7 @@ class TwitchArchive:
 
 
                 self.sendNotif('Stream - ' + live_raw_filename, 'Streamer went live: ' + self.live_info["title"])
-                subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '-o', live_raw_path])
+                subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--twitch-disable-reruns', '-o', live_raw_path])
                 if(os.path.exists(live_raw_path) is True):
                     if self.os == 'windows': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg.exe', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                   
                     elif self.os == 'linux': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                    
@@ -259,12 +259,12 @@ def main(argv):
             sys.exit()
         elif opt in ("-u", "--username"): twitch_archive.username = arg
         elif opt in ("-q", "--quality"): twitch_archive.quality = arg
-        elif opt in ("-v", "--vod"): twitch_archive.quality = int(arg)
-        elif opt in ("-c", "--chat"): twitch_archive.quality = int(arg)
-        elif opt in ("-m", "--metadata"): twitch_archive.quality = int(arg)
-        elif opt in ("-r", "--upload"): twitch_archive.quality = int(arg)
-        elif opt in ("-d", "--delete"): twitch_archive.quality = int(arg)
-        elif opt in ("-n", "--notifications"): twitch_archive.quality = int(arg)
+        elif opt in ("-v", "--vod"): twitch_archive.downloadVOD = int(arg)
+        elif opt in ("-c", "--chat"): twitch_archive.downloadCHAT = int(arg)
+        elif opt in ("-m", "--metadata"): twitch_archive.downloadMETADATA = int(arg)
+        elif opt in ("-r", "--upload"): twitch_archive.uploadCloud = int(arg)
+        elif opt in ("-d", "--delete"): twitch_archive.deleteFiles = int(arg)
+        elif opt in ("-n", "--notifications"): twitch_archive.notifications = int(arg)
     twitch_archive.run()
 if __name__ == "__main__":
     main(sys.argv[1:])
