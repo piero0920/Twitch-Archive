@@ -30,7 +30,7 @@ This option will Download the latest public VOD, if the streamer hasn't publishe
 Using a simple api request downloads the `.json` metadata of the latest VOD and saves it to:
 `/root_path/streamer_username/metadata/metada_yyyymmdd_hhmmss.json`
 ### Upload to the cloud
-Using [rclone](https://rclone.org/) after everything being downloaded and rendered , it will upload every file from the `root_path/streamer` folder  to any cloud service supported by rclone such as [Google Drive, Mega, One Drive, etc.](https://rclone.org/overview/#features)
+Using [rclone](https://rclone.org/) after everything being downloaded and rendered , it will upload every file from the `root_path/streamer` folder  to any cloud storage supported by rclone such as [Google Drive, Mega, One Drive, etc.](https://rclone.org/overview/#features)
  The destination path to where it will be uploaded it has to be stated in the `.env` file.
  Example:
  ```env

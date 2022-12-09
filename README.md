@@ -1,14 +1,14 @@
 # Twitch Archive
 Inspired by https://github.com/EnterGin/Auto-Stream-Recording-Twitch
 
-Python script to check, download live stream, VOD, chat and upload them to any cloud service supported by rclone.
+Python script to check, download live stream, VOD, chat and upload them to any cloud storage supported by rclone.
 ## Requirements
 - [Python 3](https://www.python.org/downloads/)
 - [Streamlink](https://github.com/streamlink/streamlink)
 ## Getting started
-1. Install Python 3
-2. Install Streamlink
-3. If you want to upload to any cloud service using rclone, [configure rclone](https://rclone.org/docs/#configure) (Doesnt need to download, the `rclone.exe` is avalible in [bin/rclone.exe](https://github.com/piero0920/Twitch-Archive/blob/main/bin/rclone.exe)).
+1. Install Python 3.x
+2. Install Streamlink 5.1.x
+3. If you want to upload to any cloud storage using rclone, [configure rclone](https://rclone.org/docs/#configure).
 4. `git clone https://github.com/piero0920/Twitch-Archive.git`
 5. `cd Twitch-Archive`
 6. `pip install -r requirements.txt`
