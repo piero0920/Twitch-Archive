@@ -25,7 +25,7 @@ class TwitchArchive:
         self.hls_segmentsVOD    = 10                               # 1-10 for downloading vod, it's possible to use multiple threads to potentially increase the throughput
 
     def run(self):        
-        self.terminal = self.get_OS()
+        self.os = self.get_OS()
         print('Twitch-Archive')
         print('Configuration:')
         print(f'Root path: {Fore.GREEN}' + str(pathlib.Path(self.root_path).resolve()) + f'{Style.RESET_ALL}')
@@ -67,9 +67,9 @@ class TwitchArchive:
 
     def get_OS(self):
         if sys.platform.startswith('win32'):
-            return 'powershell.exe'
+            return 'windows'
         elif sys.platform.startswith('linux'):
-            return 'bash'
+            return 'linux'
         else:
             print('OS no supported')
             return
@@ -147,9 +147,10 @@ class TwitchArchive:
 
 
                 self.sendNotif('Stream - ' + live_raw_filename, 'Streamer went live: ' + self.live_info["title"])
-                subprocess.call([self.terminal,'streamlink', 'twitch.tv/'+ self.username, self.quality, '--http-header', '"Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN') + '"', '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--output', live_raw_path])
+                subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '-o', live_raw_path])
                 if(os.path.exists(live_raw_path) is True):
-                    subprocess.call([self.terminal,str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                   
+                    if self.os == 'windows': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg.exe', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                   
+                    elif self.os == 'linux': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                    
                 else:
                     print("Skip fixing. File not found.")
                 try:
@@ -173,9 +174,10 @@ class TwitchArchive:
                                 print('Downloading VOD: ' + current_vod["title"])
                                 self.sendNotif('VOD - ' + live_raw_filename,'Downloading VOD: ' + current_vod["title"])
                                 try:
-                                    subprocess.call([self.terminal,'streamlink', 'twitch.tv/videos/' + current_vod["id"], self.quality, '--http-header', '"Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN') +'"', "--hls-segment-threads", str(self.hls_segmentsVOD), "-o", vod_raw_path])
+                                    subprocess.call(['streamlink', 'twitch.tv/videos/' + current_vod["id"], self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), "--hls-segment-threads", str(self.hls_segmentsVOD), "-o", vod_raw_path])
                                     if(os.path.exists(vod_raw_path) is True):
-                                        subprocess.call([self.terminal,str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', vod_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', vod_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                                     
+                                        if self.os == 'windows':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg.exe', '-y', '-i', vod_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', vod_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                                     
+                                        elif self.os == 'linux':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', vod_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', vod_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                                     
                                     else:
                                         print("Skip fixing. File not found.")
                                 except Exception as e:
@@ -186,7 +188,8 @@ class TwitchArchive:
                                 print('Downloading and rendering CHAT: ' + current_vod["title"])
                                 self.sendNotif('CHAT - ' + live_raw_filename,'Downloading JSON and rendering chat logs from VOD:\n' + current_vod["title"])
                                 try:
-                                    subprocess.call([self.terminal,str(pathlib.Path(__file__).parent.resolve())+"/bin/chat", current_vod["id"], os.path.join(self.chatJSON_path, "CHAT_" + live_raw_filename + ".json"), os.path.join(self.chatMP4_path, "CHAT_" + live_raw_filename + ".mp4")])
+                                    if self.os == 'windows':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+"/bin/chat.bat", current_vod["id"], os.path.join(self.chatJSON_path, "CHAT_" + live_raw_filename + ".json"), os.path.join(self.chatMP4_path, "CHAT_" + live_raw_filename + ".mp4")])
+                                    elif self.os == 'linux':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+"/bin/chat.sh", current_vod["id"], os.path.join(self.chatJSON_path, "CHAT_" + live_raw_filename + ".json"), os.path.join(self.chatMP4_path, "CHAT_" + live_raw_filename + ".mp4")])
                                 except Exception as e:
                                     self.sendNotif('ERROR - ' + live_raw_filename, "A ERROR has ocurred and chat will need to be downloaded and rendered manually.\n")
                                     print("A ERROR has ocurred and chat will need to be downloaded and rendered manually\n")
@@ -204,13 +207,14 @@ class TwitchArchive:
                         if(os.path.exists(os.path.join(self.raw_path, "VOD_" + live_raw_filename + ".ts")) is True):
                             os.remove(os.path.join(self.raw_path, "VOD_" + live_raw_filename + ".ts"))
                 if self.uploadCloud == 1:
-                    if self.terminal == 'powershell.exe':
-                        tree = subprocess.run([self.terminal,"tree", f"'{self.root_path}/{self.username}'", "/f"], capture_output=True, text=True).stdout.split("\n",2)[2]
-                    elif self.terminal == 'bash':
-                        tree = subprocess.check_output([self.terminal,"tree", str(pathlib.Path(self.root_path).resolve())+"/"+self.username]).decode(sys.stdout.encoding)
+                    if self.os == 'windows':
+                        tree = subprocess.run(['powershell.exe','tree', f'{self.root_path}/{self.username}', '/f'], capture_output=True, text=True).stdout.split("\n",2)[2]
+                    elif self.os == 'linux':
+                        tree = subprocess.check_output(['tree', str(pathlib.Path(self.root_path).resolve())+'/'+self.username]).decode(sys.stdout.encoding)
                     print('Uploading the following files:\n' + tree)
                     self.sendNotif("UPLOADING - " + live_raw_filename, 'Uploading the following files: \n' + tree)
-                    subprocess.call([self.terminal,str(pathlib.Path(__file__).parent.resolve())+'/bin/upload', str(pathlib.Path(self.root_path).resolve()),self.username])
+                    if self.os == 'windows':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/upload.bat', str(pathlib.Path(self.root_path).resolve()),self.username])
+                    elif self.os == 'linux':subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/upload.sh', str(pathlib.Path(self.root_path).resolve()),self.username])
                 if self.deleteFiles == 1:
                     self.sendNotif("DELETING - " + live_raw_filename, "Deleting the files from current seccion.")
                     print(f'{Fore.RED}DELETING FILES{Style.RESET_ALL}')
