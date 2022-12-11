@@ -16,10 +16,11 @@ Python script to check, download live stream, VOD, chat and upload them to any c
 ```.env
 CLIENT-ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 CLIENT-SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # optional to record without ADS or download sub-only VODS
 ```
 8. if you want to enable/disable more available options, edit `twitch-archive.py`
 9. run `Python twitch-archive.py` or for multiple streamers `Python twitch-archive.py -u streamer` 
+<!---
 ## Features 
 - Auto records the live stream                         | [Streamlink](https://streamlink.github.io/)
 - Downloads the VOD after stream ended                 | [Streamlink](https://streamlink.github.io/)
@@ -27,3 +28,4 @@ OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Downloads the metadata of the VOD                    | [Twitch api](https://dev.twitch.tv/docs/api/reference#get-videos)
 - Uploads them to the Cloud                            | [rclone](https://rclone.org/)
 - Notifies you through Gmail of the progress           | [smtplib](https://docs.python.org/3/library/smtplib.html)
+-->
