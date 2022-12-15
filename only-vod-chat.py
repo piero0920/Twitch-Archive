@@ -1,3 +1,7 @@
+'''
+I use this version for my personal use in a vps, edit it if you want to use it.
+it should work fine if rclone is not used, else edit function in line 235
+'''
 import requests, os, time, json, sys, subprocess, getopt, pathlib, locale, re
 from colorama import Fore, Style
 from datetime import datetime, timedelta
@@ -11,13 +15,13 @@ class TwitchArchive:
         self.username = "KalathrasLolweapon"                       # Twitch streamer username
         self.quality  = "best"                                     # Qualities options: best/source high/720p medium/540p low/360p
         # global configuration
-        self.root_path          = r"archive"                       # Path where this script saves everything (livestream,VODs,chat,metadata)
-        self.refresh            = 60                              # Time between checking (5.0 is recommended), avoid less than 1.0
+        self.root_path          = r"archive"                       # Path where this script saves everything
+        self.refresh            = 60                               # Time between checking, avoid less than 1.0
         self.downloadVOD        = 1                                # 0 - disable VOD downloading after stream finished, 1 - enable VOD downloading after stream finished (this option downloads the latest public vod)
         self.downloadCHAT       = 1                                # 0 - disable chat downloading and rendering, 1 - enable chat downloading and rendering
-        self.downloadClips      = 1
-        self.downloadMuted      = 1
-        self.downloadChatHTML   = 1
+        self.downloadClips      = 1                                # Downloads the top 10 clips made during the stream.  
+        self.downloadMuted      = 1                                # Downalods the muted parts separately if twitch mutes the vod before being downloaded 
+        self.downloadChatHTML   = 1                                # uses the 'chatupdate' mode of TwitchDownloader, parses the json file to a readeble html file eg: https://vod.kalathrasarchives.com/file/kala-help/chat_html/20221213_15h57m24s.html 
         self.uploadCloud        = 1                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
         self.deleteFiles        = 0                                # 0 - disable the deleting of files from current seccion after being uploaded to the cloud, 1 - enable the deleting files of files from current seccion after being uploaded to the cloud (BE CAREFUL WITH THIS OPTION)
         self.hls_segmentsVOD    = 10                               # 1-10 for downloading vod, it's possible to use multiple threads to potentially increase the throughput
@@ -197,7 +201,7 @@ class TwitchArchive:
                                 for clips in topClips:
                                     clip = clips['node']
                                     clean_title = re.sub(r'[/\\:*?"<>|]', '_', clip['title'])
-                                    clip_filename_path = os.path.join(self.clips_path, clean_title + '_'+ clip['id'] +".mp4")
+                                    clip_filename_path = os.path.join(self.clips_path, clip['viewCount'] + '_' + clean_title + '_' + clip['id'] +".mp4")
                                     subprocess.call([bin_path+"/TwitchDownloaderCLI.exe", 'clipDownload', '-u', clip['slug'], '-q', self.quality, '-o', clip_filename_path])
 
                             else:

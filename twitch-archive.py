@@ -18,7 +18,7 @@ class TwitchArchive:
         self.downloadMETADATA   = 1                                # 0 - disable metadata downloading, 1 - enable metadata downloading
         self.downloadVOD        = 1                                # 0 - disable VOD downloading after stream finished, 1 - enable VOD downloading after stream finished (this option downloads the latest public vod)
         self.downloadCHAT       = 1                                # 0 - disable chat downloading and rendering, 1 - enable chat downloading and rendering
-        self.uploadCloud        = 1                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
+        self.uploadCloud        = 0                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
         self.deleteFiles        = 0                                # 0 - disable the deleting of files from current seccion after being uploaded to the cloud, 1 - enable the deleting files of files from current seccion after being uploaded to the cloud (BE CAREFUL WITH THIS OPTION)
         self.cleanRaw           = 1                                # 0 - disable the deleting of raw (.ts) files, 1 - enable the deleteing of raw (.ts) files (if upload enable they will be deleted before) 
         self.hls_segments       = 3                                # 1-10 for live stream, it's possible to use multiple threads to potentially increase the throughput. 2-3 is enough
