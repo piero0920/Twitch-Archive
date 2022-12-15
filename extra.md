@@ -1,5 +1,4 @@
 ## Linux
-- use [twitch-archive](https://github.com/piero0920/Twitch-Archive/blob/main/twitch-archive)
 - install and configure rclone 
 ```
 cd bin

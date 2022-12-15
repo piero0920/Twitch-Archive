@@ -20,6 +20,9 @@ OAUTH-PRIVATE-TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # optional to record without 
 ```
 8. if you want to enable/disable more available options, edit `twitch-archive.py`
 9. run `Python twitch-archive.py` or for multiple streamers `Python twitch-archive.py -u streamer` 
+
+
+[...](https://github.com/piero0920/Twitch-Archive/blob/main/extra.md)
 <!---
 ## Features 
 - Auto records the live stream                         | [Streamlink](https://streamlink.github.io/)

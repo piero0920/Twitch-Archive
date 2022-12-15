@@ -1,4 +1,0 @@
-C:\Users\piero\Documents\GitHub\Twitch-Archive\archive\piero_fn\chat\CHAT_20221209_12h32m34s.mp4
-C:\Users\piero\Documents\GitHub\Twitch-Archive\archive\piero_fn\metadata\METADA_20221209_12h32m34s.json
-C:\Users\piero\Documents\GitHub\Twitch-Archive\archive\piero_fn\video\LIVE_20221209_12h26m03s.mp4
-C:\Users\piero\Documents\GitHub\Twitch-Archive\archive\piero_fn\video\VOD_20221209_12h32m34s.mp4
