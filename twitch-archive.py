@@ -9,18 +9,20 @@ class TwitchArchive:
     def __init__(self):
         # user configuration
         self.username = "KalathrasLolweapon"                       # Twitch streamer username
-        self.quality  = "best"                                     # Qualities options: best/source high/720p medium/540p low/360p
+        self.quality  = "audio_only"                               # Qualities options: best/source high/720p medium/540p low/360p audio_only
         # global configuration
         self.root_path          = r"archive"                       # Path where this script saves everything (livestream,VODs,chat,metadata)
         self.rclone_path        = "remote:path"                    # Path to rclone remote storage
         self.refresh            = 5.0                              # Time between checking (5.0 is recommended), avoid less than 1.0
+        self.streamlink_ttvlol  = 0                                # 0 - disable blocking ads with ttvlol, 1 - enable blocking ads with ttvlol, Uses this repo: https://github.com/2bc4/streamlink-ttvlol to block ads with ttvlol. Follows the steps on the repo to enable it.
         self.notifications      = 0                                # 0 - disable email notification of current seccion, 1 - enable email notification of current seccion
         self.downloadMETADATA   = 1                                # 0 - disable metadata downloading, 1 - enable metadata downloading
         self.downloadVOD        = 1                                # 0 - disable VOD downloading after stream finished, 1 - enable VOD downloading after stream finished (this option downloads the latest public vod)
         self.downloadCHAT       = 1                                # 0 - disable chat downloading and rendering, 1 - enable chat downloading and rendering
         self.uploadCloud        = 0                                # 0 - disable upload to remote cloud, 1 - enable upload to remote cloud
         self.deleteFiles        = 0                                # 0 - disable the deleting of files from current seccion after being uploaded to the cloud, 1 - enable the deleting files of files from current seccion after being uploaded to the cloud (BE CAREFUL WITH THIS OPTION)
-        self.cleanRaw           = 1                                # 0 - disable the deleting of raw (.ts) files, 1 - enable the deleteing of raw (.ts) files (if upload enable they will be deleted before) 
+        self.onlyRaw            = 0                                # 0 - disable the converting of ts files to mp3/mp4, 1 - enable the converting of ts files to mp3/mp4 (only works for recording, the vod will still be downloaded to mp3/mp4)
+        self.cleanRaw           = 0                                # 0 - disable the deleting of raw (.ts) files, 1 - enable the deleteing of raw (.ts) files (if upload enable they will be deleted before) 
         self.hls_segments       = 3                                # 1-10 for live stream, it's possible to use multiple threads to potentially increase the throughput. 2-3 is enough
         self.hls_segmentsVOD    = 10                               # 1-10 for downloading vod, it's possible to use multiple threads to potentially increase the throughput
 
@@ -155,15 +157,23 @@ class TwitchArchive:
                         log_id = is_live["createdAt"] + " - " + self.username + " - " + is_live["title"]
                         for line in logs:
                             if log_id in line:
-                                break
+                                time.sleep(self.refresh)
                         else:
                             logs.write(is_live["createdAt"] + " - " + self.username + " - " + is_live["title"] +"\n")
+                    
+                    if self.streamlink_ttvlol == 1:ttvlol = ['--twitch-proxy-playlist=https://api.ttv.lol']
+                    else: ttvlol = ''.split()
+
+                    if self.quality == 'audio_only':
+                        live_proc_path = os.path.join(self.video_path, "LIVE_" + live_raw_filename + ".mp3")
 
                     self.sendNotif('Stream - ' + live_raw_filename, 'Streamer went live: ' + is_live["title"])
-                    subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--twitch-disable-reruns', '-o', live_raw_path])
-                    if(os.path.exists(live_raw_path) is True):
-                        if self.os == 'windows': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg.exe', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                   
-                        elif self.os == 'linux': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg', '-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                    
+                    subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--twitch-disable-reruns', '-o', live_raw_path] + ttvlol) 
+                    if(os.path.exists(live_raw_path) is True and self.onlyRaw == 0):
+                        ffmpeg_settings = ['-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path]
+                        if self.quality == 'audio_only': ffmpeg_settings = ['-i', live_raw_path, '-vn', '-ar', '44100', '-ac', '2', '-b:a', '192k', live_proc_path]
+                        if self.os == 'windows': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg.exe']+ ffmpeg_settings, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                   
+                        elif self.os == 'linux': subprocess.call([str(pathlib.Path(__file__).parent.resolve())+'/bin/ffmpeg']+ ffmpeg_settings, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)                    
                     else:
                         print("Skip fixing. File not found.")
                     
@@ -175,13 +185,15 @@ class TwitchArchive:
 
                     if live_date_min <= vod_date <= live_date_max:                    
                         vod_proc_path = os.path.join(self.video_path, "VOD_" + live_raw_filename + ".mp4")
-                        vod_proc_path = os.path.join(self.video_path, live_raw_filename + ".mp4")
-                        chat_json_path = os.path.join(self.chatJSON_path, live_raw_filename + ".json")
-                        chat_video_path = os.path.join(self.chatMP4_path, live_raw_filename + ".mp4")
+                        chat_json_path = os.path.join(self.chatJSON_path, "CHAT_" + live_raw_filename + ".json")
+                        chat_video_path = os.path.join(self.chatMP4_path, "CHAT_" + live_raw_filename + ".mp4")
                         if self.downloadMETADATA == 1:
                             self.sendNotif('Metadata - ' + live_raw_filename,'Downloading and saving metadata:\n' + json.dumps(current_vod, indent=4))
                             with open(os.path.join(self.metadata_path, "METADA_" + live_raw_filename + ".json"), 'w', encoding='utf-8') as f:
                                 json.dump(current_vod, f, ensure_ascii=False, indent=4)
+
+                        if self.quality == 'audio_only':
+                            vod_proc_path = os.path.join(self.video_path, "VOD_" + live_raw_filename + ".mp3")
 
                         if self.downloadVOD == 1:
                             print('Downloading VOD: ' + current_vod["title"])
@@ -255,7 +267,21 @@ class TwitchArchive:
             else: time.sleep(self.refresh)
 def main(argv):
     twitch_archive = TwitchArchive()
-    help_msg = 'Twitch-Archive\nPython script to record twitch live stream, download the VOD, metadata, chat and render it, and uploads them to any cloud storage.\n -h, --help          Display this information\n -u, --username      <username> Twitch channel username\n -q, --quality       <quality> best/source high/720p medium/480p worst/360p\n -v, --vod           <1/0> Download vod\n -c, --chat          <1/0> Download chat and render it\n -m, --metadata      <1/0> Download metadata\n -r, --upload        <1/0> Upload to cloud storage\n -d, --delete        <1/0> Delete all files after upload (CAREFUL with this arg)\n -n, --notifications <1/0> Receive email notification of the proccess through gmail\n'
+    help_msg = '''
+    Twitch-Archive
+    Python script to record twitch live stream, download the VOD, metadata, chat and render it, and uploads them to any cloud storage.
+    
+    -h, --help                      Display this information 
+    -u, --username                  <username> Twitch channel username
+    -q, --quality                   <quality> best/source high/720p medium/480p worst/360p 
+    -a, --ttv-lol                   <1/0> Block ads with ttv-lol https://github.com/2bc4/streamlink-ttvlol
+    -v, --vod                       <1/0> Download vod
+    -c, --chat                      <1/0> Download chat and render it 
+    -m, --metadata                  <1/0> Download metadata
+    -r, --upload                    <1/0> Upload to cloud storage
+    -d, --delete                    <1/0> Delete all files after upload (CAREFUL with this arg)
+    -n, --notifications             <1/0> Receive email notification of the proccess through gmail
+    '''
     try:
         opts, args = getopt.getopt(argv,"h:u:q:v:c:m:r:d:n",["username=","quality=","vod=","chat=","metadata=","upload=","delete=","notifications="])
     except getopt.GetoptError:
@@ -267,6 +293,7 @@ def main(argv):
             sys.exit()
         elif opt in ("-u", "--username"): twitch_archive.username = arg
         elif opt in ("-q", "--quality"): twitch_archive.quality = arg
+        elif opt in ("-a", "--ttv-lol"): twitch_archive.streamlink_ttvlol = int(arg)
         elif opt in ("-v", "--vod"): twitch_archive.downloadVOD = int(arg)
         elif opt in ("-c", "--chat"): twitch_archive.downloadCHAT = int(arg)
         elif opt in ("-m", "--metadata"): twitch_archive.downloadMETADATA = int(arg)
