@@ -167,7 +167,7 @@ class TwitchArchive:
                     if self.quality == 'audio_only':
                         live_proc_path = os.path.join(self.video_path, "LIVE_" + live_raw_filename + ".mp3")
                     
-                    if (os.getenv("OAUTH-PRIVATE-TOKEN") != "" or os.getenv("OAUTH-PRIVATE-TOKEN") is not None or os.getenv("OAUTH-PRIVATE-TOKEN") != "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"):
+                    if (os.getenv("OAUTH-PRIVATE-TOKEN") != "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"):
                         auth = ['--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN')]
                     else: auth = ''.split()
                     self.sendNotif('Stream - ' + live_raw_filename, 'Streamer went live: ' + is_live["title"])
