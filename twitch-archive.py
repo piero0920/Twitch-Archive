@@ -8,8 +8,8 @@ from email.mime.text import MIMEText
 class TwitchArchive:
     def __init__(self):
         # user configuration
-        self.username = "KalathrasLolweapon"                       # Twitch streamer username
-        self.quality  = "audio_only"                               # Qualities options: best/source high/720p medium/540p low/360p audio_only
+        self.username = "dogzilar123"                       # Twitch streamer username
+        self.quality  = "best"                               # Qualities options: best/source high/720p medium/540p low/360p audio_only
         # global configuration
         self.root_path          = r"archive"                       # Path where this script saves everything (livestream,VODs,chat,metadata)
         self.rclone_path        = "remote:path"                    # Path to rclone remote storage
@@ -166,9 +166,12 @@ class TwitchArchive:
 
                     if self.quality == 'audio_only':
                         live_proc_path = os.path.join(self.video_path, "LIVE_" + live_raw_filename + ".mp3")
-
+                    
+                    if (os.getenv("OAUTH-PRIVATE-TOKEN") != "" or os.getenv("OAUTH-PRIVATE-TOKEN") is not None or os.getenv("OAUTH-PRIVATE-TOKEN") != "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"):
+                        auth = ['--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN')]
+                    else: auth = ''.split()
                     self.sendNotif('Stream - ' + live_raw_filename, 'Streamer went live: ' + is_live["title"])
-                    subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--twitch-api-header', 'Authorization=OAuth ' + os.getenv('OAUTH-PRIVATE-TOKEN'), '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--twitch-disable-reruns', '-o', live_raw_path] + ttvlol) 
+                    subprocess.call(['streamlink', 'twitch.tv/'+ self.username, self.quality, '--hls-segment-threads', str(self.hls_segments), '--hls-live-restart', '--retry-streams', str(self.refresh), '--twitch-disable-reruns', '-o', live_raw_path] + ttvlol + auth) 
                     if(os.path.exists(live_raw_path) is True and self.onlyRaw == 0):
                         ffmpeg_settings = ['-y', '-i', live_raw_path, '-analyzeduration', '2147483647', '-probesize', '2147483647', '-c:v', 'copy', '-c:a', 'copy', '-start_at_zero', '-copyts', live_proc_path]
                         if self.quality == 'audio_only': ffmpeg_settings = ['-i', live_raw_path, '-vn', '-ar', '44100', '-ac', '2', '-b:a', '192k', live_proc_path]
