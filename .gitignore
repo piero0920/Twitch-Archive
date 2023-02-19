@@ -1,5 +1,6 @@
 # Environments
 .env
+archive
 # Tests
 test.py
 a.py
